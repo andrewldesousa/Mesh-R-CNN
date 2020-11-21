@@ -1,0 +1,10 @@
+version: "3"
+
+services:
+  api:
+    build: .
+    container_name: 3DSSL-api
+    ports:
+      - 8000:8000
+    volumes:
+      - '.:/api'
