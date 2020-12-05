@@ -1,0 +1,13 @@
+# Exclude macOS metadata
+.DS_Store
+.localized
+
+# Exluce PyCharm config
+.idea
+
+# Exclude output object files
+*.obj
+*.mtl
+
+# Ignore git configuration
+.gitconfig
