@@ -2,6 +2,8 @@ fastapi
 uvicorn
 pydantic
 pandas
+pytorch3d
+opencv-python
 
 python-multipart
 pytest
