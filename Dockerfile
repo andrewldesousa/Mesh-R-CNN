@@ -1,4 +1,4 @@
-FROM ubuntu:19.10
+FROM nvidia/cuda:10.2-base-ubuntu18.04
 
 COPY ./api /api/api
 COPY requirements.txt /requirements.txt
