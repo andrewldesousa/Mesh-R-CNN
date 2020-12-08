@@ -170,11 +170,12 @@ class VisualizationDemo(object):
         save_obj(save_file, verts, faces)
 
 
-def setup_cfg():
+def setup_cfg(slit_idx=0):
+    splits = ["../meshrcnn/meshrcnn_R50.pth", "../meshrcnn/meshrcnn_S2_R50.pth"]
     cfg = get_cfg()
     get_meshrcnn_cfg_defaults(cfg)
     cfg.merge_from_file("../meshrcnn/configs/pix3d/meshrcnn_R50_FPN.yaml")
-    cfg.merge_from_list(["MODEL.WEIGHTS", "../meshrcnn/meshrcnn_S2_R50.pth"])
+    cfg.merge_from_list(["MODEL.WEIGHTS", splits[slit_idx]])
     cfg.freeze()
     return cfg
 
