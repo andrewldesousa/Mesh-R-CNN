@@ -22,7 +22,7 @@ def predict(img: bytes = File(...), split: int = 0):
     demo = VisualizationDemo(cfg, vis_highest_scoring=False, output_dir='output')
     
     input_img = cv2.imread('output/input.png')
-    predictions = demo.run_on_image(input_img)
+    predictions = demo.run_on_image(input_img, focal_length=20.0)
 
     with zipfile.ZipFile('response.zip', 'w') as myzip:
         for i in os.listdir('output'):
