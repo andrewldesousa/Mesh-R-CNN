@@ -30,5 +30,3 @@ def predict(img: bytes = File(...), split: int = 0):
 
     response = FileResponse(path='response.zip', filename='response.zip')
     return response
-
-    
