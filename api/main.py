@@ -10,7 +10,6 @@ app = FastAPI()
 
 @app.post("/predict")
 def predict(img: bytes = File(...), split: int = 0):
-    return None
     # Clear old files and save input image
     os.system('rm response.zip && rm -rf output && mkdir output')
     input_img = open(f'output/input.png', "wb")
