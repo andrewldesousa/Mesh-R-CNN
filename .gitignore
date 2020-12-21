@@ -2,3 +2,12 @@ venv
 __pycache__/
 output/
 response.zip
+
+# Exclude macOS specific files
+.DS_Store
+
+# Exclude gitconfig
+.gitconfig
+
+# Exclude IntelliJ files
+.idea
