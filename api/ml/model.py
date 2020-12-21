@@ -170,7 +170,7 @@ class MeshRCNNModel(object):
 
         mesh = self.add_texture_to_mesh(mesh, K, image)
 
-        save_file = os.path.join(self.output_dir, "%d_mesh_%s_%.3f.obj" % (det_id, cat_name, score))
+        save_file = os.path.join(self.output_dir, "%d_mesh_%s_%.3f.ply" % (det_id, cat_name, score))
         mesh.export(save_file, encoding='binary', vertex_normal=mesh.vertex_normals.tolist())
 
     @staticmethod
