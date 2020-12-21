@@ -24,7 +24,7 @@ import cv2
 logger = logging.getLogger("demo")
 
 
-class VisualizationDemo(object):
+class MeshRCNNModel(object):
     def __init__(self, cfg, vis_highest_scoring=True, output_dir="./vis"):
         """
         Args:
@@ -191,7 +191,7 @@ if __name__ == "__main__":
 
     im_name = args.input.split("/")[-1].split(".")[0]
 
-    demo = VisualizationDemo(
+    demo = MeshRCNNModel(
         cfg, vis_highest_scoring=args.onlyhighest, output_dir=os.path.join(args.output, im_name)
     )
 
