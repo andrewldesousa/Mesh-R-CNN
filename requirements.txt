@@ -2,6 +2,10 @@ fastapi
 uvicorn
 pydantic
 pandas
+torch
+pytorch3d
+trimesh
+detectron2
 
 python-multipart
 pytest
