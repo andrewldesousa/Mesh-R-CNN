@@ -3,14 +3,13 @@ import cv2
 import zipfile
 from fastapi import FastAPI, File
 from fastapi.responses import FileResponse
-from api.ml.model import setup_cfg, VisualizationDemo
+from api.ml.model import setup_cfg, MeshRCNNModel
 
 
 app = FastAPI()
 
 @app.post("/predict")
 def predict(img: bytes = File(...), split: int = 0):
-    return None
     # Clear old files and save input image
     os.system('rm response.zip && rm -rf output && mkdir output')
     input_img = open(f'output/input.png', "wb")
@@ -19,10 +18,10 @@ def predict(img: bytes = File(...), split: int = 0):
     
     
     cfg = setup_cfg(split)
-    demo = VisualizationDemo(cfg, vis_highest_scoring=False, output_dir='output')
+    demo = MeshRCNNModel(cfg, vis_highest_scoring=False, output_dir='output')
     
     input_img = cv2.imread('output/input.png')
-    predictions = demo.run_on_image(input_img)
+    predictions = demo.run_on_image(input_img, focal_length=20.0)
 
     with zipfile.ZipFile('response.zip', 'w') as myzip:
         for i in os.listdir('output'):
@@ -30,5 +29,3 @@ def predict(img: bytes = File(...), split: int = 0):
 
     response = FileResponse(path='response.zip', filename='response.zip')
     return response
-
-    
