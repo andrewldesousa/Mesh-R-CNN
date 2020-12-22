@@ -45,7 +45,7 @@ class MeshRCNNModel(object):
         os.makedirs(output_dir, exist_ok=True)
         self.output_dir = output_dir
 
-    def run_on_image(self, image, focal_length=10.0):
+    def run_on_image(self, image, focal_length=20.0):
         """
         Args:
             image (np.ndarray): an image of shape (H, W, C) (in BGR order).
