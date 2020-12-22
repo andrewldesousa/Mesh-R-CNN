@@ -19,12 +19,14 @@ import meshrcnn.utils  # noqa
 from meshrcnn.config import get_meshrcnn_cfg_defaults
 from meshrcnn.evaluation import transform_meshes_to_camera_coord_system
 
+from trimesh.base import Trimesh
+
 import cv2
 
 logger = logging.getLogger("demo")
 
 
-class VisualizationDemo(object):
+class MeshRCNNModel(object):
     def __init__(self, cfg, vis_highest_scoring=True, output_dir="./vis"):
         """
         Args:
@@ -107,12 +109,13 @@ class VisualizationDemo(object):
                     scores[det_id],
                     masks[det_id],
                     meshes[det_id],
+                    K
                 )
 
         return predictions
 
     def visualize_prediction(
-        self, det_id, image, box, label, score, mask, mesh, alpha=0.6, dpi=200
+        self, det_id, image, box, label, score, mask, mesh, K, alpha=0.6, dpi=200
     ):
 
         mask_color = np.array(self.colors[label], dtype=np.float32)
@@ -165,9 +168,37 @@ class VisualizationDemo(object):
         save_file = os.path.join(self.output_dir, "%d_mask_%s_%.3f.png" % (det_id, cat_name, score))
         cv2.imwrite(save_file, composite[:, :, ::-1])
 
-        save_file = os.path.join(self.output_dir, "%d_mesh_%s_%.3f.obj" % (det_id, cat_name, score))
+        mesh = self.add_texture_to_mesh(mesh, K, image)
+
+        save_file = os.path.join(self.output_dir, "%d_mesh_%s_%.3f.ply" % (det_id, cat_name, score))
+        mesh.export(save_file, encoding='binary', vertex_normal=mesh.vertex_normals.tolist())
+
+    @staticmethod
+    def add_texture_to_mesh(mesh, K, image):
+        f, ox, oy = K
         verts, faces = mesh.get_mesh_verts_faces(0)
-        save_obj(save_file, verts, faces)
+        verts = verts.tolist()
+
+        pix_pos = []
+        for v in verts:
+            x, y, z = v
+            i = -x * f / z + K[1]
+            j = -y * f / z + K[2]
+            pix_pos.append([j, i])
+
+        colors = []
+        for i in pix_pos:
+            try:
+                colors.append(list(image[int(i[0])][int(i[1])]) + [1])
+                image[int(i[0])][int(i[1])][0] = 0
+                image[int(i[0])][int(i[1])][1] = 0
+                image[int(i[0])][int(i[1])][2] = 255
+            except:
+                pass
+
+        textured_mesh = Trimesh(vertices=verts, faces=faces, vertex_colors=colors)
+
+        return textured_mesh
 
 
 def setup_cfg(split_idx=0):
@@ -180,7 +211,6 @@ def setup_cfg(split_idx=0):
     return cfg
 
 
-
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
     args = get_parser().parse_args()
@@ -191,7 +221,7 @@ if __name__ == "__main__":
 
     im_name = args.input.split("/")[-1].split(".")[0]
 
-    demo = VisualizationDemo(
+    demo = MeshRCNNModel(
         cfg, vis_highest_scoring=args.onlyhighest, output_dir=os.path.join(args.output, im_name)
     )
 
