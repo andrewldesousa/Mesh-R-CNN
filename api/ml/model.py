@@ -10,7 +10,6 @@ from detectron2.data.detection_utils import read_image
 from detectron2.engine.defaults import DefaultPredictor
 from detectron2.utils.logger import setup_logger
 from pytorch3d.io import save_ply
-from pytorch3d.structures import Meshes
 from trimesh.exchange.ply import export_ply
 
 
@@ -24,6 +23,8 @@ from trimesh.smoothing import filter_laplacian
 
 
 from trimesh.base import Trimesh
+from trimesh.visual import TextureVisuals
+from PIL import Image
 
 import cv2
 
@@ -248,6 +249,25 @@ class MeshRCNNModel(object):
                 pass
 
         textured_mesh = Trimesh(vertices=verts, faces=faces, vertex_colors=colors)
+
+        return textured_mesh
+
+    @staticmethod
+    def add_uv_texture_to_mesh(mesh, K, image):
+        f, ox, oy = K
+        verts, faces = mesh.get_mesh_verts_faces(0)
+        verts = verts.tolist()
+
+        pix_pos = []
+        for v in verts:
+            x, y, z = v
+            i = int(-x * f / z + K[1]) / image.shape[1]
+            j = int(y * f / z + K[2]) / image.shape[0]
+            pix_pos.append([i, j])
+
+        image_ = Image.fromarray(image)
+        texture = TextureVisuals(uv=pix_pos, image=image_)
+        textured_mesh = Trimesh(vertices=verts, faces=faces, visual=texture)
 
         return textured_mesh
 
