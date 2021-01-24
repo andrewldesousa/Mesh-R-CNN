@@ -9,8 +9,10 @@ from detectron2.data import MetadataCatalog
 from detectron2.data.detection_utils import read_image
 from detectron2.engine.defaults import DefaultPredictor
 from detectron2.utils.logger import setup_logger
-from pytorch3d.io import save_obj
+from pytorch3d.io import save_ply
 from pytorch3d.structures import Meshes
+from trimesh.exchange.ply import export_ply
+
 
 # required so that .register() calls are executed in module scope
 import meshrcnn.data  # noqa
@@ -18,6 +20,8 @@ import meshrcnn.modeling  # noqa
 import meshrcnn.utils  # noqa
 from meshrcnn.config import get_meshrcnn_cfg_defaults
 from meshrcnn.evaluation import transform_meshes_to_camera_coord_system
+from trimesh.smoothing import filter_laplacian
+
 
 from trimesh.base import Trimesh
 
@@ -25,6 +29,43 @@ import cv2
 
 logger = logging.getLogger("demo")
 
+
+
+from meshrcnn.modeling.roi_heads.mesh_head import MeshRCNNGraphConvHead, ROI_MESH_HEAD_REGISTRY
+from meshrcnn.modeling.roi_heads.voxel_head import ROI_VOXEL_HEAD_REGISTRY, VoxelRCNNConvUpsampleHead
+from detectron2.utils.registry import Registry
+from pytorch3d.structures import Meshes
+from pytorch3d.ops.vert_align import vert_align
+import torch.nn.functional as F
+from pytorch3d.renderer.mesh.rasterize_meshes import rasterize_meshes
+
+
+
+try:
+    del ROI_MESH_HEAD_REGISTRY._obj_map['MeshRCNNGraphConvHeadWithViz']
+except:
+    pass
+
+@ROI_MESH_HEAD_REGISTRY.register()
+class MeshRCNNGraphConvHeadWithViz(MeshRCNNGraphConvHead):
+    def forward(self, x, mesh):
+        if x.numel() == 0 or mesh.isempty():
+            return [Meshes(verts=[], faces=[])]
+        
+        save_file = os.path.join('output', 'voxel.ply')
+        verts, faces = mesh.get_mesh_verts_faces(0)
+        save_ply(save_file, verts.cpu(), faces.cpu())
+        
+        last_mesh = None
+        meshes = []
+        vert_feats = None
+        for stage in self.stages:
+            mesh, vert_feats = stage(x, mesh, vert_feats=vert_feats)
+            last_vert_feats = vert_feats
+            last_mesh = mesh
+            meshes.append(mesh)
+      
+        return meshes
 
 class MeshRCNNModel(object):
     def __init__(self, cfg, vis_highest_scoring=True, output_dir="./vis"):
@@ -45,7 +86,7 @@ class MeshRCNNModel(object):
         os.makedirs(output_dir, exist_ok=True)
         self.output_dir = output_dir
 
-    def run_on_image(self, image, focal_length=10.0):
+    def run_on_image(self, image, focal_length=20.0, highest_only=True):
         """
         Args:
             image (np.ndarray): an image of shape (H, W, C) (in BGR order).
@@ -111,11 +152,13 @@ class MeshRCNNModel(object):
                     meshes[det_id],
                     K
                 )
+                if highest_only:
+                    break
 
         return predictions
 
     def visualize_prediction(
-        self, det_id, image, box, label, score, mask, mesh, K, alpha=0.6, dpi=200
+        self, det_id, image, box, label, score, mask, mesh, K, alpha=0.6, dpi=200, smoothing=True
     ):
 
         mask_color = np.array(self.colors[label], dtype=np.float32)
@@ -168,10 +211,18 @@ class MeshRCNNModel(object):
         save_file = os.path.join(self.output_dir, "%d_mask_%s_%.3f.png" % (det_id, cat_name, score))
         cv2.imwrite(save_file, composite[:, :, ::-1])
 
-        mesh = self.add_texture_to_mesh(mesh, K, image)
+        
+        if smoothing:
+            mesh = self.add_texture_to_mesh(mesh, K, image)
+            save_file = os.path.join(self.output_dir, "%d_mesh_%s_%.3f.ply" % (det_id, cat_name, score))
+            mesh.export(save_file, encoding='binary', vertex_normal=mesh.vertex_normals.tolist())            
+            mesh = filter_laplacian(mesh)
+            smoothing_file = os.path.join(self.output_dir, "with_smoothing.ply")
+            obj = export_ply(mesh)
+            mesh.export(smoothing_file, encoding='binary', vertex_normal=mesh.vertex_normals.tolist())  
+            #f.save()
+            #f.close()
 
-        save_file = os.path.join(self.output_dir, "%d_mesh_%s_%.3f.ply" % (det_id, cat_name, score))
-        mesh.export(save_file, encoding='binary', vertex_normal=mesh.vertex_normals.tolist())
 
     @staticmethod
     def add_texture_to_mesh(mesh, K, image):
@@ -205,7 +256,7 @@ def setup_cfg(split_idx=0):
     splits = ["../meshrcnn/meshrcnn_R50.pth", "../meshrcnn/meshrcnn_S2_R50.pth"]
     cfg = get_cfg()
     get_meshrcnn_cfg_defaults(cfg)
-    cfg.merge_from_file("../meshrcnn/configs/pix3d/meshrcnn_R50_FPN.yaml")
+    cfg.merge_from_file("../meshrcnn/configs/viz.yaml")
     cfg.merge_from_list(["MODEL.WEIGHTS", splits[split_idx]])
     cfg.freeze()
     return cfg
