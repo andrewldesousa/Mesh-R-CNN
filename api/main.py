@@ -8,6 +8,7 @@ from api.ml.model import setup_cfg, MeshRCNNModel
 
 app = FastAPI()
 
+
 @app.post("/predict")
 def predict(img: bytes = File(...), split: int = 0):
     # Clear old files and save input image
@@ -15,17 +16,16 @@ def predict(img: bytes = File(...), split: int = 0):
     input_img = open(f'output/input.png', "wb")
     input_img.write(img)
     input_img.close()
-    
-    
+
     cfg = setup_cfg(split)
-    demo = MeshRCNNModel(cfg, vis_highest_scoring=False, output_dir='output')
+    model = MeshRCNNModel(cfg, vis_highest_scoring=False, output_dir='output')
     
     input_img = cv2.imread('output/input.png')
-    predictions = demo.run_on_image(input_img, focal_length=20.0)
+    model.run_on_image(input_img, focal_length=20.0)
 
-    with zipfile.ZipFile('response.zip', 'w') as myzip:
+    with zipfile.ZipFile('response.zip', 'w') as zip_file:
         for i in os.listdir('output'):
-            myzip.write(f'output/{i}')
+            zip_file.write(f'output/{i}')
 
     response = FileResponse(path='response.zip', filename='response.zip')
     return response

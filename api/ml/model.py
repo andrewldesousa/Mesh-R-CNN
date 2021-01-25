@@ -1,50 +1,38 @@
-import argparse
 import logging
-import multiprocessing as mp
-import numpy as np
 import os
 import torch
-from detectron2.config import get_cfg
-from detectron2.data import MetadataCatalog
-from detectron2.data.detection_utils import read_image
-from detectron2.engine.defaults import DefaultPredictor
-from detectron2.utils.logger import setup_logger
-from pytorch3d.io import save_ply
-from pytorch3d.structures import Meshes
-from trimesh.exchange.ply import export_ply
-
+import numpy as np
+import cv2
 
 # required so that .register() calls are executed in module scope
 import meshrcnn.data  # noqa
 import meshrcnn.modeling  # noqa
 import meshrcnn.utils  # noqa
+
 from meshrcnn.config import get_meshrcnn_cfg_defaults
 from meshrcnn.evaluation import transform_meshes_to_camera_coord_system
 from trimesh.smoothing import filter_laplacian
-
-
+from trimesh.exchange.obj import export_obj
+from trimesh.exchange.ply import export_ply
 from trimesh.base import Trimesh
-
-import cv2
-
-logger = logging.getLogger("demo")
-
-
+from trimesh.visual import TextureVisuals
+from trimesh.resolvers import FilePathResolver
+from detectron2.config import get_cfg
+from detectron2.data import MetadataCatalog
+from detectron2.engine.defaults import DefaultPredictor
+from pytorch3d.io import save_ply
+from PIL import Image
 
 from meshrcnn.modeling.roi_heads.mesh_head import MeshRCNNGraphConvHead, ROI_MESH_HEAD_REGISTRY
-from meshrcnn.modeling.roi_heads.voxel_head import ROI_VOXEL_HEAD_REGISTRY, VoxelRCNNConvUpsampleHead
-from detectron2.utils.registry import Registry
 from pytorch3d.structures import Meshes
-from pytorch3d.ops.vert_align import vert_align
-import torch.nn.functional as F
-from pytorch3d.renderer.mesh.rasterize_meshes import rasterize_meshes
 
-
+logger = logging.getLogger("model")
 
 try:
     del ROI_MESH_HEAD_REGISTRY._obj_map['MeshRCNNGraphConvHeadWithViz']
 except:
     pass
+
 
 @ROI_MESH_HEAD_REGISTRY.register()
 class MeshRCNNGraphConvHeadWithViz(MeshRCNNGraphConvHead):
@@ -66,6 +54,7 @@ class MeshRCNNGraphConvHeadWithViz(MeshRCNNGraphConvHead):
             meshes.append(mesh)
       
         return meshes
+
 
 class MeshRCNNModel(object):
     def __init__(self, cfg, vis_highest_scoring=True, output_dir="./vis"):
@@ -211,18 +200,26 @@ class MeshRCNNModel(object):
         save_file = os.path.join(self.output_dir, "%d_mask_%s_%.3f.png" % (det_id, cat_name, score))
         cv2.imwrite(save_file, composite[:, :, ::-1])
 
-        
-        if smoothing:
-            mesh = self.add_texture_to_mesh(mesh, K, image)
-            save_file = os.path.join(self.output_dir, "%d_mesh_%s_%.3f.ply" % (det_id, cat_name, score))
-            mesh.export(save_file, encoding='binary', vertex_normal=mesh.vertex_normals.tolist())            
-            mesh = filter_laplacian(mesh)
-            smoothing_file = os.path.join(self.output_dir, "with_smoothing.ply")
-            obj = export_ply(mesh)
-            mesh.export(smoothing_file, encoding='binary', vertex_normal=mesh.vertex_normals.tolist())  
-            #f.save()
-            #f.close()
+        basic_texturing_mesh = self.add_texture_to_mesh(mesh, K, image)
 
+        save_file = os.path.join(self.output_dir, "%d_mesh_%s_%.3f.ply" % (det_id, cat_name, score))
+        basic_texturing_mesh.export(save_file, encoding='binary',
+                                    vertex_normal=basic_texturing_mesh.vertex_normals.tolist())
+
+        uv_texturing_mesh = self.add_uv_texture_to_mesh(mesh, K, image)
+        uv_texturing_mesh = filter_laplacian(uv_texturing_mesh)
+        res = FilePathResolver('./output')
+        uv_texturing_mesh = export_obj(uv_texturing_mesh, resolver=res)
+
+        file_path = './output/uv_textured.obj'
+        with open(file_path, "w") as f:
+            f.write(uv_texturing_mesh)
+
+        if smoothing:
+            basic_texturing_mesh = filter_laplacian(basic_texturing_mesh)
+            smoothing_file = os.path.join(self.output_dir, "with_smoothing.ply")
+            basic_texturing_mesh.export(smoothing_file, encoding='binary',
+                                        vertex_normal=basic_texturing_mesh.vertex_normals.tolist())
 
     @staticmethod
     def add_texture_to_mesh(mesh, K, image):
@@ -241,13 +238,30 @@ class MeshRCNNModel(object):
         for i in pix_pos:
             try:
                 colors.append(list(image[int(i[0])][int(i[1])]) + [1])
-                image[int(i[0])][int(i[1])][0] = 0
-                image[int(i[0])][int(i[1])][1] = 0
-                image[int(i[0])][int(i[1])][2] = 255
-            except:
+            except IndexError:
+                print(f"Skipping index: {i}")
                 pass
 
         textured_mesh = Trimesh(vertices=verts, faces=faces, vertex_colors=colors)
+
+        return textured_mesh
+
+    @staticmethod
+    def add_uv_texture_to_mesh(mesh, K, image):
+        f, ox, oy = K
+        verts, faces = mesh.get_mesh_verts_faces(0)
+        verts = verts.tolist()
+
+        uv_map = []
+        for v in verts:
+            x, y, z = v
+            i = int(-x * f / z + K[1]) / image.shape[1]
+            j = int(y * f / z + K[2]) / image.shape[0]
+            uv_map.append([i, j])
+
+        image_ = Image.fromarray(image)
+        texture = TextureVisuals(uv=uv_map, image=image_)
+        textured_mesh = Trimesh(vertices=verts, faces=faces, visual=texture)
 
         return textured_mesh
 
@@ -260,23 +274,3 @@ def setup_cfg(split_idx=0):
     cfg.merge_from_list(["MODEL.WEIGHTS", splits[split_idx]])
     cfg.freeze()
     return cfg
-
-
-if __name__ == "__main__":
-    mp.set_start_method("spawn", force=True)
-    args = get_parser().parse_args()
-    logger = setup_logger(name="demo")
-    logger.info("Arguments: " + str(args))
-
-    cfg = setup_cfg(args)
-
-    im_name = args.input.split("/")[-1].split(".")[0]
-
-    demo = MeshRCNNModel(
-        cfg, vis_highest_scoring=args.onlyhighest, output_dir=os.path.join(args.output, im_name)
-    )
-
-    # use PIL, to be consistent with evaluation
-    img = read_image(args.input, format="BGR")
-    predictions = demo.run_on_image(img, focal_length=args.focal_length)
-    logger.info("Predictions saved in %s" % (os.path.join(args.output, im_name)))
