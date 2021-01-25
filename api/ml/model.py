@@ -204,7 +204,7 @@ class MeshRCNNModel(object):
 
         save_file = os.path.join(self.output_dir, "%d_mesh_%s_%.3f.ply" % (det_id, cat_name, score))
         basic_texturing_mesh.export(save_file, encoding='binary',
-                                    vertex_normal=mesh.vertex_normals.tolist())
+                                    vertex_normal=basic_texturing_mesh.vertex_normals.tolist())
 
         uv_texturing_mesh = self.add_uv_texture_to_mesh(mesh, K, image)
         uv_texturing_mesh = filter_laplacian(uv_texturing_mesh)
@@ -216,10 +216,10 @@ class MeshRCNNModel(object):
             f.write(uv_texturing_mesh)
 
         if smoothing:
-            mesh = filter_laplacian(mesh)
+            basic_texturing_mesh = filter_laplacian(basic_texturing_mesh)
             smoothing_file = os.path.join(self.output_dir, "with_smoothing.ply")
-            mesh.export(smoothing_file, encoding='binary',
-                        vertex_normal=mesh.vertex_normals.tolist())
+            basic_texturing_mesh.export(smoothing_file, encoding='binary',
+                                        vertex_normal=basic_texturing_mesh.vertex_normals.tolist())
 
     @staticmethod
     def add_texture_to_mesh(mesh, K, image):
