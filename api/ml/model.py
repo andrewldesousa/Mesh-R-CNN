@@ -266,7 +266,8 @@ class MeshRCNNModel(object):
         return textured_mesh
 
     @staticmethod
-    def back_face_culling(mesh):
+    def get_front_view_faces(mesh):
+        # This is an implementation of Back-face Culling
         vertices = mesh.vertices
         faces = mesh.faces
         normals = mesh.face_normals
