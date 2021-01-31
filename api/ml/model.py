@@ -265,6 +265,21 @@ class MeshRCNNModel(object):
 
         return textured_mesh
 
+    @staticmethod
+    def back_face_culling(mesh):
+        vertices = mesh.vertices
+        faces = mesh.faces
+        normals = mesh.face_normals
+
+        front_view = []
+
+        for i in range(len(faces)):
+            # -V0(.)N > 0, where (.) denotes dot product and V0 is first vertex of the face
+            if np.dot(-(vertices[faces[i][0]]), normals[i]) > 1e-5:
+                front_view.append(np.array(faces[i]))
+
+        return front_view
+
 
 def setup_cfg(split_idx=0):
     splits = ["../meshrcnn/meshrcnn_R50.pth", "../meshrcnn/meshrcnn_S2_R50.pth"]
