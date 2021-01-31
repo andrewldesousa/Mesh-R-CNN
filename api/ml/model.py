@@ -206,7 +206,7 @@ class MeshRCNNModel(object):
         basic_texturing_mesh.export(save_file, encoding='binary',
                                     vertex_normal=basic_texturing_mesh.vertex_normals.tolist())
 
-        uv_texturing_mesh = self.add_uv_texture_to_mesh(mesh, K, image, mask)
+        uv_texturing_mesh = self.add_uv_texture_to_mesh(mesh, K, image, mask.numpy())
         res = FilePathResolver('./output')
         uv_texturing_mesh = export_obj(uv_texturing_mesh, resolver=res)
 
