@@ -206,8 +206,7 @@ class MeshRCNNModel(object):
         basic_texturing_mesh.export(save_file, encoding='binary',
                                     vertex_normal=basic_texturing_mesh.vertex_normals.tolist())
 
-        uv_texturing_mesh = self.add_uv_texture_to_mesh(mesh, K, image)
-        uv_texturing_mesh = filter_laplacian(uv_texturing_mesh)
+        uv_texturing_mesh = self.add_uv_texture_to_mesh(mesh, K, image, mask.numpy())
         res = FilePathResolver('./output')
         uv_texturing_mesh = export_obj(uv_texturing_mesh, resolver=res)
 
@@ -247,23 +246,59 @@ class MeshRCNNModel(object):
         return textured_mesh
 
     @staticmethod
-    def add_uv_texture_to_mesh(mesh, K, image):
+    def add_uv_texture_to_mesh(mesh, K, image, mask):
         f, ox, oy = K
         verts, faces = mesh.get_mesh_verts_faces(0)
         verts = verts.tolist()
+        mesh = Trimesh(vertices=verts, faces=faces)
+        mesh = filter_laplacian(mesh)
+        verts = mesh.vertices
+        faces = mesh.faces
+
+        front_view_faces = MeshRCNNModel.get_front_view_faces(mesh)
+        front_view_vertices = np.unique(np.array(front_view_faces))
 
         uv_map = []
-        for v in verts:
-            x, y, z = v
-            i = int(-x * f / z + K[1]) / image.shape[1]
-            j = int(y * f / z + K[2]) / image.shape[0]
+        for vertex_index in range(len(verts)):
+            if vertex_index in front_view_vertices:
+                x, y, z = verts[vertex_index]
+                i = int(-x * f / z + K[1]) / image.shape[1]
+                j = int(y * f / z + K[2]) / image.shape[0]
+            else:
+                i = 0
+                j = 0
             uv_map.append([i, j])
+
+        # Average color calculation inside the mask
+        color_mask = ~np.repeat(mask[:, :, np.newaxis], 3, axis=2)
+        average_color = np.ma.array(image, mask=color_mask).mean(axis=0).mean(axis=0)
+
+        # Assign average color to pixels outside of the mask
+        image[:, :, 0] = np.where(~mask, average_color[0], image[:, :, 0])
+        image[:, :, 1] = np.where(~mask, average_color[1], image[:, :, 1])
+        image[:, :, 2] = np.where(~mask, average_color[2], image[:, :, 2])
 
         image_ = Image.fromarray(image)
         texture = TextureVisuals(uv=uv_map, image=image_)
         textured_mesh = Trimesh(vertices=verts, faces=faces, visual=texture)
 
         return textured_mesh
+
+    @staticmethod
+    def get_front_view_faces(mesh):
+        # This is an implementation of Back-face Culling
+        vertices = mesh.vertices
+        faces = mesh.faces
+        normals = mesh.face_normals
+
+        front_view = []
+
+        for i in range(len(faces)):
+            # -V0(.)N > 0, where (.) denotes dot product and V0 is first vertex of the face
+            if np.dot(-(vertices[faces[i][0]]), normals[i]) > 1e-5:
+                front_view.append(np.array(faces[i]))
+
+        return front_view
 
 
 def setup_cfg(split_idx=0):
