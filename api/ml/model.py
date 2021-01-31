@@ -33,6 +33,8 @@ try:
 except:
     pass
 
+from .retrieval import MeshRetrieval
+
 
 @ROI_MESH_HEAD_REGISTRY.register()
 class MeshRCNNGraphConvHeadWithViz(MeshRCNNGraphConvHead):
@@ -74,6 +76,14 @@ class MeshRCNNModel(object):
 
         os.makedirs(output_dir, exist_ok=True)
         self.output_dir = output_dir
+
+        self.retrieval = MeshRetrieval(
+            embeddings_path="mesh_embeddings.npy",
+            class_mappings_path="class_mappings.p",
+            model_path="/home/teampc20b/retrieval/logs/20-01-2021_180140/autoencoder.pth",
+            shape_net_path="/home/teampc20b/retrieval/ShapeNetCore.v2",
+            device=torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+        )
 
     def run_on_image(self, image, focal_length=20.0, highest_only=True):
         """
@@ -147,7 +157,7 @@ class MeshRCNNModel(object):
         return predictions
 
     def visualize_prediction(
-        self, det_id, image, box, label, score, mask, mesh, K, alpha=0.6, dpi=200, smoothing=True
+        self, det_id, image, box, label, score, mask, mesh, K, alpha=0.6, dpi=200
     ):
 
         mask_color = np.array(self.colors[label], dtype=np.float32)
@@ -214,11 +224,15 @@ class MeshRCNNModel(object):
         with open(file_path, "w") as f:
             f.write(uv_texturing_mesh)
 
-        if smoothing:
-            basic_texturing_mesh = filter_laplacian(basic_texturing_mesh)
-            smoothing_file = os.path.join(self.output_dir, "with_smoothing.ply")
-            basic_texturing_mesh.export(smoothing_file, encoding='binary',
-                                        vertex_normal=basic_texturing_mesh.vertex_normals.tolist())
+        basic_texturing_mesh = filter_laplacian(basic_texturing_mesh)
+        smoothing_file = os.path.join(self.output_dir, "with_smoothing.ply")
+        basic_texturing_mesh.export(smoothing_file, encoding='binary',
+                                    vertex_normal=basic_texturing_mesh.vertex_normals.tolist())
+
+        best_match = self.retrieval.find_closest(basic_texturing_mesh,cat_name)
+        best_match_file = os.path.join(self.output_dir, "retrieval.ply")
+        best_match.export(best_match_file, encoding='binary',
+                                    vertex_normal=best_match.vertex_normals.tolist())
 
     @staticmethod
     def add_texture_to_mesh(mesh, K, image):

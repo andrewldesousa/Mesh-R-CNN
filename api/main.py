@@ -4,10 +4,17 @@ import zipfile
 from fastapi import FastAPI, File
 from fastapi.responses import FileResponse
 from api.ml.model import setup_cfg, MeshRCNNModel
-
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_methods=["GET","POST","PUT"],
+    allow_headers=["*"],
+)
 
 @app.post("/predict")
 def predict(img: bytes = File(...), split: int = 0):
