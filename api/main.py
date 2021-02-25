@@ -11,7 +11,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=['http://localhost:3000'],
     allow_methods=["GET","POST","PUT"],
     allow_headers=["*"],
 )
@@ -21,7 +21,7 @@ def predict(img: bytes = File(...), split: int = 0):
     # Clear old files and save input image
     os.system('rm response.zip && rm -rf output && mkdir output')
     input_img = open(f'output/input.png', "wb")
-    input_img.write(img)
+    input_img.write(img) 
     input_img.close()
 
     cfg = setup_cfg(split)

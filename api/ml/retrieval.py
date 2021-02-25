@@ -8,6 +8,7 @@ import trimesh
 import pytorch3d
 import trimesh
 
+
 class MeshRetrieval:
 
     def __init__(self,
@@ -47,7 +48,6 @@ class MeshRetrieval:
             for k,v in self.class_mappings.items():
                 if v["indices"][0]<=index and v["indices"][1]>index:
                     file = v["files"][index.item()-v["indices"][0]]
-        print(index.item(),file)
         base,_ = os.path.split(file)
         mesh_file = os.path.join(self.shape_net_path,base,"models","model_normalized.obj")
         with open(mesh_file,"r") as f:
@@ -68,7 +68,6 @@ class MeshRetrieval:
         
 
     def find_closest(self,trimesh_mesh,class_name):    
-        print(class_name)
         random_rotations = process_ply(trimesh_mesh)
         model_embeddings = self.model(random_rotations.to(self.device))[0]
         
@@ -78,16 +77,14 @@ class MeshRetrieval:
         best_distance = 100
         best_query = -1
 
-        print(class_embeddings.shape)
-
         for i,sample in enumerate(model_embeddings):
             distances = torch.sqrt(torch.sum((sample-class_embeddings.to(self.device))**2,dim=1))
-            sorted_indices = distances.argsort()[:4]
-            if distances[sorted_indices[0]] < best_distance:
-                best = sorted_indices[0]
-                best_distance = distances[sorted_indices[0]] 
+            sorted_indices = distances.argsort()[0]
+            if distances[sorted_indices] < best_distance:
+                best = sorted_indices
+                best_distance = distances[sorted_indices] 
                 best_query = i
-
+                
         return self.get_mesh(class_name,best)
 
 def normalize_mesh(mesh,max_size=32):
@@ -101,6 +98,10 @@ def normalize_mesh(mesh,max_size=32):
     return mesh.apply_transform(t_mat)
 
 def process_ply(mesh,random_rotations=32):
+
+    # Reproducibility
+    torch.manual_seed(0)
+
     normalized_mesh = normalize_mesh(mesh)
 
     rot_mats = pytorch3d.transforms.random_rotations(random_rotations).numpy()
@@ -116,5 +117,5 @@ def process_ply(mesh,random_rotations=32):
                     values=torch.ones(indices.shape[1]),
                     size=[32, 32, 32]).to_dense().unsqueeze(0)
 
-
+ 
     return target

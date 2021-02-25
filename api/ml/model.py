@@ -164,7 +164,7 @@ class MeshRCNNModel(object):
         cat_name = self.cat_names[label]
         thickness = max([int(np.ceil(0.001 * image.shape[0])), 1])
         box_color = (0, 255, 0)  # '#00ff00', green
-        text_color = (218, 227, 218)  # gray
+        text_color = (20, 20, 20)  # gray
 
         composite = image.copy().astype(np.float32)
 
@@ -181,10 +181,10 @@ class MeshRCNNModel(object):
         composite = composite.astype(np.uint8)
 
         # overlay text
-        font_scale = 0.001 * image.shape[0]
+        font_scale = 0.002 * image.shape[0]
         font_thickness = thickness
         font = cv2.FONT_HERSHEY_TRIPLEX
-        text = "%s %.3f" % (cat_name, score)
+        text = cat_name
         ((text_w, text_h), _) = cv2.getTextSize(text, font, font_scale, font_thickness)
         # Place text background.
         if x0 + text_w > composite.shape[1]:
