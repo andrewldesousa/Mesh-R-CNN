@@ -6,6 +6,9 @@ This repository contains a web application for interacting with Mesh R-CNN and o
 ![Mesh R-CNN Archiecture](mesh_arch.png)
 
 
+For more information regarding the original Mesh R-CNN work, visit this [link](https://arxiv.org/abs/1906.02739)
+
+
 ## Usage
 
 For running the app with hot reload functionality.
@@ -18,4 +21,4 @@ If you don't need hot reload functionality, then running
 
 
 ## Functionality
-
+After cloning this repository and setting up the dependencies propery (with requirements.txt), you are able to interact with the model. The API returns everything with the original Mesh R-CNN model plus more. What gets returned are predictions for bounding box, classification, voxel representation, mesh representation, and textured mesh representations.
